@@ -13,6 +13,22 @@ const userSchema = new mongoose.Schema(
         passwordHash: { type: String, required: true },
         role: { type: String, default: "USER", enum: ["USER", "ADMIN"] },
         avatar: { type: String, default: "" },
+        gender: {
+            type: String,
+            enum: ["male", "female"],
+            required: true,
+        },
+
+        coins: {
+            type: Number,
+            default: 100,
+        },
+
+        lastClaim: {
+            type: Date,
+            default: Date.now,
+        },
+
         stats: {
             rating: { type: Number, default: 1200 },
             wins: { type: Number, default: 0 },

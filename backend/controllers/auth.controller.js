@@ -24,13 +24,14 @@ const login = async (req, res) => {
             process.env.JWT_ACCESS_SECRET,
             { expiresIn: "15m" },
         );
+        const isProd = process.env.NODE_ENV === "production";
 
         res.cookie("accessToken", accessToken, {
-            httpOnly: true,//js cannot read the cookie. only browser can read it
-            secure: process.env.NODE_ENV === "production",
-            maxAge: 10 * 60 * 1000,
+            httpOnly: true,
+            secure: false,
+            sameSite: "lax",
+            maxAge: 15 * 60 * 1000,
         });
-
 
         const refreshToken = jwt.sign(
             { sub: user._id, role: user.role, type: "refresh" },
@@ -39,8 +40,9 @@ const login = async (req, res) => {
         );
 
         res.cookie("refreshToken", refreshToken, {
-            httpOnly: true,//js cannot read the cookie. only browser can read it
-            secure: process.env.NODE_ENV === "production",
+            httpOnly: true,
+            secure: false,
+            sameSite: "lax",
             path: "/api/v1/auth/refresh",
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
@@ -52,8 +54,8 @@ const login = async (req, res) => {
 
 const signup = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
-        if (!name || !email || !password) {
+        const { name, email, password, gender } = req.body;
+        if (!name || !email || !password || !gender) {
             return res.status(400).json({ message: "Please fill all the details" });
         }
 
@@ -101,5 +103,41 @@ const logout = (req, res) => {
     }
 };
 
+const refresh = async (req, res) => {
+    try {
+        const { refreshToken } = req.cookies;
+        if (!refreshToken) {
+            return res.status(400).json({ message: "Refresh token missing" });
+        }
+        const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        if (payload.type !== "refresh") {
+            return res.status(400).json({ message: "Token type not refresh" });
+        }
+        const id = payload.sub;
+        const user = await User.findById(id);
+        if (!user) {
+            res.clearCookie("refreshToken", {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                path: "/api/v1/auth/refresh",
+            });
+            return res.status(400).json({ message: "User not found" });
+        }
+        const accessToken = jwt.sign(
+            { sub: user._id, role: user.role },
+            process.env.JWT_ACCESS_SECRET,
+            { expiresIn: "15m" },
+        );
+        res.cookie("accessToken", accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            maxAge: 15 * 60 * 1000,
+        });
+        return res.status(200).json({ message: "OK" });
+    } catch (err) {
+        return res.status(500).json({ message: err.message });
+    }
+};
 
-module.exports = { login, signup, fetchMe, logout }
+
+module.exports = { login, signup, fetchMe, logout, refresh }
